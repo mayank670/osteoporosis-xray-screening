@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.venv/
+venv/
+
+# --- Secrets and local configuration ---
+.env
+
+# --- Medical images and datasets (never commit patient data) ---
+# A leading "/" anchors the rule to the project root. Without it, "data/" would also
+# ignore the code package ml/data/ (that bug was found by the Colab zip check).
+/data/
+/uploads/
+
+# --- Generated outputs ---
+/artifacts/
+/reports/
+/instance/
+*.keras
+*.h5
+*.weights.h5
+*.db
+*.sqlite3
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# --- Personal documentation (kept locally, not published) ---
+/docs/

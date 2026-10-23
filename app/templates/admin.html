@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Admin</p>
+    <h1>How the system is doing</h1>
+    <p class="muted">Usage numbers and recent problems. Admins never see anyone's images or reports.</p>
+  </div>
+</div>
+<div class="grid stats">
+  <div class="card stat"><span class="stat-value">{{ user_count }}</span><span class="stat-label">Users</span></div>
+  <div class="card stat"><span class="stat-value">{{ status_counts.get('completed', 0) }}</span><span class="stat-label">Completed scans</span></div>
+  <div class="card stat"><span class="stat-value">{{ status_counts.get('failed', 0) }}</span><span class="stat-label">Failed scans</span></div>
+  <div class="card stat"><span class="stat-value">{{ status_counts.get('processing', 0) }}</span><span class="stat-label">Processing</span></div>
+</div>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Active model</h2>
+    {% if model_ready %}
+    <dl class="meta">
+      <dt>Version</dt><dd>{{ metadata.model_version }}</dd>
+      <dt>Backbone</dt><dd>{{ metadata.backbone }}</dd>
+      <dt>Grad-CAM layer</dt><dd>{{ metadata.gradcam_layer }}</dd>
+      {% if metadata.environment %}<dt>TensorFlow</dt><dd>{{ metadata.environment.tensorflow }}</dd>{% endif %}
+      {% if metadata.promoted_at %}<dt>Promoted</dt><dd>{{ metadata.promoted_at }}</dd>{% endif %}
+    </dl>
+    {% else %}
+    <p class="field-error">No model loaded: {{ model_error }}</p>
+    {% endif %}
+    <p class="hint">To update the model: <code>python scripts/promote_model.py &lt;run&gt; &lt;fold&gt;</code>,
+      which validates the candidate before replacing the active model, then restart the server.</p>
+  </section>
+  <section class="card">
+    <h2>Outputs by class and model version</h2>
+    <table class="compact">
+      {% for label, n in label_counts.items() %}<tr><th scope="row">{{ label }}</th><td>{{ n }}</td></tr>{% endfor %}
+      {% for version, n in version_counts %}<tr><th scope="row" class="muted">{{ version }}</th><td>{{ n }}</td></tr>{% endfor %}
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Recent failures</h2>
+  {% if failures %}
+  <table class="compact">
+    <thead><tr><th scope="col">Scan</th><th scope="col">User ID</th><th scope="col">Time (UTC)</th><th scope="col">Message</th></tr></thead>
+    {% for scan in failures %}
+    <tr><td>S-{{ '%06d' % scan.id }}</td><td>{{ scan.user_id }}</td>
+        <td>{{ scan.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ scan.error_message }}</td></tr>
+    {% endfor %}
+  </table>
+  <p class="hint">Full technical details are in <code>instance/logs/app.log</code> on the server.</p>
+  {% else %}<p class="muted">No failures recorded.</p>{% endif %}
+</section>
+{% endblock %}

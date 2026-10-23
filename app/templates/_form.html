@@ -1,0 +1,7 @@
+{% macro field(f, autocomplete=None) %}
+<div class="field{% if f.errors %} has-error{% endif %}">
+  {{ f.label }}
+  {{ f(autocomplete=autocomplete, **({'aria-invalid': 'true', 'aria-describedby': f.id ~ '-error'} if f.errors else {})) }}
+  {% for error in f.errors %}<p class="field-error" id="{{ f.id }}-error">{{ error }}</p>{% endfor %}
+</div>
+{% endmacro %}

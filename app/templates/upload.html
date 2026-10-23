@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}New scan{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">New scan</p>
+    <h1>Let's take a look at a knee X-ray</h1>
+    <p class="lead">Upload the image, add a few details about the person, and you'll get a result in a few seconds.</p>
+  </div>
+</div>
+
+{% if model_error %}
+<div class="alert alert-error" role="alert">{{ icon('alert') }}
+  <p><strong>Analysis is unavailable.</strong> No trained model is installed on this server yet.
+  An administrator needs to train and install one (README → "Training").</p>
+</div>
+{% endif %}
+
+<ol class="stepper" aria-label="Progress">
+  <li class="active"><span class="dot">1</span> X-ray</li>
+  <li class="active"><span class="dot">2</span> About the person</li>
+  <li><span class="dot">3</span> Result</li>
+</ol>
+
+<div class="upload-layout">
+  <section class="card">
+    <form id="upload-form" method="post" action="{{ url_for('main.predict') }}" enctype="multipart/form-data" novalidate>
+      {{ form.csrf_token }}
+      <h2 class="section-title"><span class="badge-num">1</span> The X-ray</h2>
+      <label for="image" class="dropzone" id="dropzone">
+        <input id="image" name="image" type="file" accept=".png,.jpg,.jpeg,.tif,.tiff,.bmp,image/png,image/jpeg,image/tiff,image/bmp" required
+               aria-describedby="upload-help{% if form.image.errors %} upload-error{% endif %}">
+        <span class="dropzone-prompt" id="dropzone-prompt">
+          <span class="dropzone-icon">{{ icon('upload') }}</span>
+          <strong>Drop the X-ray here</strong>
+          <span class="muted">or click to choose a file from your computer</span>
+        </span>
+        <img id="preview" class="preview" alt="Preview of the selected X-ray" hidden>
+        <span id="file-name" class="file-name"></span>
+      </label>
+      <p id="upload-help" class="hint">
+        PNG, JPEG, TIFF or BMP · up to {{ max_mb }} MB · at least 64 × 64 px.
+        The file's contents are checked, not just its name. Please use a knee X-ray: the system can't tell
+        what body part an image shows.
+      </p>
+      {% for error in form.image.errors %}<p class="field-error" id="upload-error" role="alert">{{ error }}</p>{% endfor %}
+
+      {% if clinical_available %}
+      <h2 class="section-title"><span class="badge-num">2</span> About the person</h2>
+      <div class="clinical-toggle">
+        <label class="checkbox">{{ form.use_clinical(id="use_clinical") }} {{ form.use_clinical.label.text }}</label>
+        <p class="hint">
+          The X-ray on its own was close to guessing in our tests
+          {%- if heldout.image %} (macro F1 {{ '%.2f' % heldout.image.macro_f1 }}){% endif %}.
+          Age, sex, height, weight and a few risk factors
+          {%- if heldout_hybrid %} raised it to {{ '%.2f' % heldout_hybrid.macro_f1 }}, and the model then caught
+          {{ '%.0f' % (heldout_hybrid.osteoporosis_recall * 100) }}% of osteoporosis cases{% endif %}.
+        </p>
+      </div>
+      <fieldset id="clinical-fields" class="clinical-fields" {% if not form.use_clinical.data %}hidden{% endif %}>
+        <legend>Details</legend>
+        <div class="field-grid">
+          {% for name in ['age', 'sex', 'height_cm', 'weight_kg', 'menopause_age', 'walking_km'] %}
+            {% set f = form[name] %}
+            <div class="field{% if f.errors %} has-error{% endif %}">
+              {{ f.label }}
+              {{ f(inputmode='decimal' if name in ['height_cm', 'weight_kg', 'walking_km'] else None,
+                   **({'aria-invalid': 'true', 'aria-describedby': f.id ~ '-error'} if f.errors else {})) }}
+              {% for error in f.errors %}<p class="field-error" id="{{ f.id }}-error">{{ error }}</p>{% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+        <p class="small muted">Tick anything that applies:</p>
+        <div class="chips">
+          {% for name in form.FLAG_FIELDS %}
+            <label class="chip">{{ form[name]() }} {{ form[name].label.text }}</label>
+          {% endfor %}
+        </div>
+        <p class="hint">We never ask for a bone-density result (T-score), because that's exactly what the model is trying to estimate.</p>
+      </fieldset>
+      {% endif %}
+
+      <p id="client-error" class="field-error" role="alert" hidden></p>
+      <div class="submit-row">
+        <button type="submit" class="button primary large" id="submit-button" {% if model_error %}disabled{% endif %}>
+          <span class="spinner" aria-hidden="true" hidden></span>
+          <span class="label">Analyse X-ray</span>
+        </button>
+        <span class="privacy-note">{{ icon('lock') }} Only you can see this scan.</span>
+      </div>
+    </form>
+  </section>
+
+  <aside class="card side-card" aria-label="Tips">
+    <h3>{{ icon('sparkles') }} Tips for a good result</h3>
+    <ul class="tips">
+      <li>Use a front-facing (AP) knee X-ray; one or both knees is fine.</li>
+      <li>Fill in the person's details: they matter more than the image.</li>
+      <li>Leave the menopause age empty for men, and for women who haven't reached menopause.</li>
+    </ul>
+    <h3>{{ icon('stethoscope') }} Please remember</h3>
+    <p class="small muted">This is a student research prototype. It can be wrong. About one result in three
+      was wrong in our tests. Only a DXA bone-density scan, read by a doctor, can confirm osteoporosis.</p>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/upload.js') }}" data-max-bytes="{{ max_mb * 1024 * 1024 }}" id="upload-script"></script>
+{% endblock %}

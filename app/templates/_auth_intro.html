@@ -1,0 +1,15 @@
+{% from "_icons.html" import icon %}
+<section class="auth-intro" aria-label="About OsteoScreen">
+  <div>
+    <p class="eyebrow">Bone health · AI research prototype</p>
+    <h1>A gentle first look at bone health from a knee X-ray</h1>
+    <p class="lead">OsteoScreen shows how a deep-learning model reads knee X-rays, and explains what it looked at.</p>
+  </div>
+  <ol class="steps-list">
+    <li><span class="step-num">1</span><span><strong>Upload a knee X-ray.</strong> PNG, JPEG, TIFF or BMP.</span></li>
+    <li><span class="step-num">2</span><span><strong>Add a few details</strong> such as age and weight. They make the result far more reliable.</span></li>
+    <li><span class="step-num">3</span><span><strong>Read the result in plain words</strong>, with a heatmap and a PDF you can keep.</span></li>
+  </ol>
+  <p class="disclaimer">{{ icon('shield') }} Your scans are private to your account. OsteoScreen is a student research
+    project, not a diagnosis. Bone density is confirmed with a DXA scan by a doctor.</p>
+</section>

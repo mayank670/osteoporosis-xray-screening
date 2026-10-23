@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Scan S-{{ '%06d' % scan.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Result · Scan S-{{ '%06d' % scan.id }}</p>
+    <h1>Here's what the model found</h1>
+    <p class="muted">{{ scan.uploaded_at.strftime('%d %b %Y, %H:%M') }} UTC · {{ scan.original_filename }}</p>
+  </div>
+  <a class="button" href="{{ url_for('main.upload') }}">{{ icon('upload') }} Analyse another X-ray</a>
+</div>
+
+{% if scan.status != 'completed' %}
+  <div class="alert alert-error" role="alert">{{ icon('alert') }}
+    <p>Sorry, this scan {{ 'could not be analysed' if scan.status == 'failed' else 'is still being processed' }}.
+    {{ scan.error_message or '' }}</p>
+  </div>
+{% else %}
+{% set p = scan.prediction %}
+{% set cls = p.label|lower %}
+{% set boost = p.component_scores_dict.get('osteoporosis_boost', 1.0) %}
+{% set top = p.scores|dictsort(by='value')|last %}
+
+<div class="grid two">
+  <section class="card">
+    <h2>Result
+      {% if p.mode == 'hybrid' %}<span class="mode-badge mode-hybrid">{{ icon('check') }} X-ray + patient details</span>
+      {% else %}<span class="mode-badge mode-image_only">{{ icon('alert') }} X-ray only</span>{% endif %}
+    </h2>
+
+    <div class="verdict {{ cls }}">
+      <span class="verdict-icon">{{ icon('bone') }}</span>
+      <div>
+        <p class="verdict-label">{{ p.label }}</p>
+        <p class="verdict-sub">Model score {{ '%.2f' % p.confidence }} · not a probability of disease</p>
+      </div>
+    </div>
+
+    <p class="plain-words">
+      {% if p.label == 'Normal' %}
+        In plain words: this looks most like the people in our data whose bone density was <strong>normal</strong>.
+      {% elif p.label == 'Osteopenia' %}
+        In plain words: this looks most like people with <strong>mildly reduced bone density</strong> (osteopenia).
+        That is common with age and is not the same as osteoporosis.
+      {% else %}
+        In plain words: this looks most like people with <strong>osteoporosis</strong>, meaning clearly reduced
+        bone density. It's worth discussing a DXA scan with a doctor.
+      {% endif %}
+    </p>
+
+    {% if p.mode == 'image_only' %}
+    <div class="alert alert-error" role="note">{{ icon('alert') }}
+      <p><strong>Low reliability.</strong> Without patient details, the model was close to guessing in our tests
+      {%- if heldout.image %} (it found only {{ '%.0f' % (heldout.image.osteoporosis_recall * 100) }}% of osteoporosis cases){% endif %},
+      and it tends to answer “Osteopenia”. For a more meaningful result, analyse it again with the person's details.</p>
+    </div>
+    {% elif heldout_hybrid %}
+    <p class="hint">How often this mode was right in testing: {{ '%.0f' % (heldout_hybrid.accuracy * 100) }}% overall, and it caught
+      {{ '%.0f' % (heldout_hybrid.osteoporosis_recall * 100) }}% of osteoporosis cases (n = {{ heldout_hybrid.n }}).
+      Still wrong about 1 time in 3.</p>
+    {% endif %}
+
+    <div class="bars" role="list" aria-label="Model scores for each class">
+      {% for name, value in p.scores.items() %}
+      <div class="bar-row{% if name == p.label %} top{% endif %}" role="listitem">
+        <span class="name">{{ name }}</span>
+        <span class="bar-track"><span class="bar-fill {{ name|lower }}" data-value="{{ '%.4f' % value }}"></span></span>
+        <span class="value">{{ '%.0f' % (value * 100) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if p.mode == 'hybrid' and boost > 1 %}
+    <p class="hint">{{ icon('info') }} Screening rule: “Osteoporosis” is chosen whenever {{ '%.1f' % boost }} × its score is the highest,
+      so fewer cases are missed (at the cost of more false alarms).
+      {% if top[0] != p.label %}<strong>Here the rule changed the label</strong>: the highest raw score was {{ top[0] }} ({{ '%.0f' % (top[1] * 100) }}%).{% endif %}</p>
+    {% endif %}
+
+    <h3>What you could do next</h3>
+    <ul class="next-steps">
+      <li>{{ icon('stethoscope') }}<span>Talk to a doctor. A <strong>DXA scan</strong> is the standard test for bone density.</span></li>
+      <li>{{ icon('heart') }}<span>Bone health is helped by weight-bearing exercise, enough calcium and vitamin D, and not smoking.</span></li>
+      <li>{{ icon('file') }}<span>Download the PDF report below to keep or share.</span></li>
+    </ul>
+
+    <div class="actions">
+      {% if p.report %}
+      <a class="button primary" href="{{ url_for('main.report_pdf', report_id=p.report.id) }}">{{ icon('file') }} Download PDF report</a>
+      {% endif %}
+      <a class="button" href="{{ url_for('main.history') }}">{{ icon('history') }} My scans</a>
+    </div>
+
+    {% set parts = p.component_scores_dict %}
+    {% if p.mode == 'hybrid' and parts.clinical %}
+    <details class="disclosure">
+      <summary>How the combined score was formed</summary>
+      <table class="scores">
+        <thead><tr><th scope="col">Class</th><th scope="col">Patient details</th><th scope="col">X-ray</th><th scope="col">Combined</th></tr></thead>
+        <tbody>
+        {% for name, value in p.scores.items() %}
+          <tr><th scope="row">{{ name }}</th><td>{{ '%.3f' % parts.clinical[name] }}</td>
+              <td>{{ '%.3f' % parts.image[name] }}</td><td>{{ '%.3f' % value }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if fusion_image_weight is not none %}<p class="hint">Combined = weighted geometric mean (patient details {{ '%.1f' % (1 - fusion_image_weight) }}, X-ray {{ '%.1f' % fusion_image_weight }}). The weights were chosen on validation data.</p>{% endif %}
+      {% set ci = p.clinical_inputs_dict %}
+      <p class="hint">Details used: {{ ci.age }} years, {{ ci.sex }}, {{ ci.height_cm }} cm, {{ ci.weight_kg }} kg
+        {%- if ci.menopause_age %}, menopause at {{ ci.menopause_age }}{% endif %}
+        {%- for flag in ['smoker', 'diabetic', 'hypothyroidism', 'estrogen_use', 'fracture_history', 'family_history'] if ci[flag] %}, {{ flag.replace('_', ' ') }}{% endfor %}.</p>
+    </details>
+    {% endif %}
+
+    <details class="disclosure">
+      <summary>Technical details</summary>
+      <dl class="meta">
+        <dt>Model version</dt><dd>{{ p.model_version }}</dd>
+        <dt>Preprocessing</dt><dd>{{ p.preprocessing_version }}</dd>
+        <dt>Predicted at</dt><dd>{{ p.predicted_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</dd>
+        <dt>Raw scores</dt><dd>{% for name, value in p.scores.items() %}{{ name }} {{ '%.3f' % value }}{% if not loop.last %} · {% endif %}{% endfor %}</dd>
+      </dl>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Where the model looked</h2>
+    <div class="image-pair">
+      <figure>
+        <img src="{{ url_for('main.scan_image', scan_id=scan.id, kind='input') }}" alt="The uploaded X-ray, as the model sees it">
+        <figcaption>Your X-ray (as the model sees it)</figcaption>
+      </figure>
+      <figure>
+        {% if p.report and p.report.heatmap_path %}
+        <img id="overlay-img" src="{{ url_for('main.scan_image', scan_id=scan.id, kind='overlay') }}"
+             data-base-url="{{ url_for('main.scan_overlay_custom', scan_id=scan.id) }}"
+             alt="Heatmap over the X-ray showing the regions that most influenced the {{ p.label }} result">
+        <figcaption>Heatmap for “{{ p.label }}”{% if not p.heatmap_informative %}: no strong evidence found{% endif %}</figcaption>
+        {% else %}
+        <p class="muted">A heatmap isn't available for this scan.</p>
+        {% endif %}
+      </figure>
+    </div>
+    {% if p.report and p.report.heatmap_path %}
+    <form class="controls" id="overlay-controls" aria-label="Heatmap display">
+      <label for="alpha">Heatmap strength <output id="alpha-value" for="alpha">0.40</output></label>
+      <input type="range" id="alpha" min="0" max="1" step="0.05" value="0.4">
+      <label for="colormap">Colours</label>
+      <select id="colormap">
+        {% for name in colormaps %}<option value="{{ name }}" {% if name == 'jet' %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+    </form>
+    <p class="hint">Warmer colours show the parts of the X-ray that pushed the model most towards this answer
+      (Grad-CAM). It helps explain the model, but it doesn't prove the reasoning is medically right.</p>
+    {% endif %}
+    <div class="alert alert-warning" role="note">{{ icon('info') }}
+      <p><strong>This is not a diagnosis.</strong> It's an experimental screening aid from a student research project.
+      Scores are model outputs, not calibrated probabilities. Bone density is confirmed by a DXA scan and a doctor.</p>
+    </div>
+  </section>
+</div>
+{% endif %}
+<p><a href="{{ url_for('main.history') }}">{{ icon('back') }} Back to my scans</a></p>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/result.js') }}"></script>{% endblock %}

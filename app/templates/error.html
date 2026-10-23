@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="card empty">
+  <p class="error-code">{{ status }}</p>
+  <h1>{{ title }}</h1>
+  <p class="muted">{{ message }}</p>
+  <a class="button primary" href="{{ url_for('main.index') }}">{{ icon('back') }} Take me back</a>
+</section>
+{% endblock %}

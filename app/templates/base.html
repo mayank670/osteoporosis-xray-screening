@@ -1,0 +1,53 @@
+{% from "_icons.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OsteoScreen{% endblock %} · OsteoScreen</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="{{ url_for('main.index') }}">
+        <span class="brand-logo">{{ icon('bone') }}</span>
+        OsteoScreen
+        <span class="brand-tag">research prototype</span>
+      </a>
+      {% if current_user.is_authenticated %}
+      <nav class="nav" aria-label="Main">
+        <span class="greeting">Hi, {{ current_user.name.split()[0] }}</span>
+        <a href="{{ url_for('main.upload') }}" {% if request.endpoint in ('main.upload', 'main.predict') %}aria-current="page"{% endif %}>{{ icon('upload') }} New scan</a>
+        <a href="{{ url_for('main.history') }}" {% if request.endpoint in ('main.history', 'main.scan_detail') %}aria-current="page"{% endif %}>{{ icon('history') }} My scans</a>
+        {% if current_user.is_admin %}<a href="{{ url_for('admin.dashboard') }}" {% if request.endpoint == 'admin.dashboard' %}aria-current="page"{% endif %}>{{ icon('settings') }} Admin</a>{% endif %}
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+          {{ logout_form.csrf_token }}
+          <button type="submit" class="link-button">{{ icon('logout') }} Log out</button>
+        </form>
+      </nav>
+      {% endif %}
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" role="status">{{ icon('check' if category == 'success' else 'info') }}<p>{{ message }}</p></div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span>{{ icon('heart') }} <strong>Not a medical device.</strong> An academic screening-support prototype. It does not diagnose
+        osteoporosis and does not replace a DXA scan or a doctor.</span>
+      {% if model_version %}<span class="muted">Model: {{ model_version }}</span>{% endif %}
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

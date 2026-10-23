@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_form.html" import field %}
+{% block title %}Create account{% endblock %}
+{% block content %}
+<div class="auth">
+  {% include "_auth_intro.html" %}
+  <section class="card auth-form">
+    <h2>Create your account</h2>
+    <p class="subtitle">It takes less than a minute. Your scans will only be visible to you.</p>
+    <form method="post" novalidate>
+      {{ form.csrf_token }}
+      {{ field(form.name, "name") }}
+      {{ field(form.email, "email") }}
+      {{ field(form.password, "new-password") }}
+      {{ field(form.confirm, "new-password") }}
+      <p class="hint">Use at least 8 characters.</p>
+      <br>
+      <button type="submit" class="button primary full large">Create account</button>
+    </form>
+    <p class="muted center small">Already registered? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+  </section>
+</div>
+{% endblock %}

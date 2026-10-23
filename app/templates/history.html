@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}My scans{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">My scans</p>
+    <h1>Your earlier results</h1>
+    <p class="muted">Only you can see these. Open any scan to view its heatmap or download its report.</p>
+  </div>
+  <a class="button primary" href="{{ url_for('main.upload') }}">{{ icon('upload') }} New scan</a>
+</div>
+
+{% if scans %}
+<ul class="scan-list">
+  {% for scan in scans %}
+  {% set p = scan.prediction %}
+  <li class="scan-item">
+    {% if scan.display_path %}
+      <img class="scan-thumb" src="{{ url_for('main.scan_image', scan_id=scan.id, kind='input') }}" alt="" loading="lazy">
+    {% else %}
+      <span class="scan-thumb placeholder">{{ icon('image') }}</span>
+    {% endif %}
+    <div class="scan-main">
+      <a class="scan-link" href="{{ url_for('main.scan_detail', scan_id=scan.id) }}">Scan S-{{ '%06d' % scan.id }}</a>
+      <p class="scan-sub">{{ scan.uploaded_at.strftime('%d %b %Y, %H:%M') }} UTC · {{ scan.original_filename }}
+        {% if p %}· {{ 'with patient details' if p.mode == 'hybrid' else 'X-ray only' }}{% endif %}</p>
+    </div>
+    <div class="scan-side">
+      {% if p %}<span class="pill {{ p.label|lower }}">{{ p.label }}</span>{% endif %}
+      {% if scan.status != 'completed' %}<span class="badge badge-{{ scan.status }}">{{ scan.status }}</span>{% endif %}
+      {% if p and p.report %}
+        <a class="button" href="{{ url_for('main.report_pdf', report_id=p.report.id) }}">{{ icon('file') }} PDF</a>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<section class="card empty">
+  <div class="empty-art">{{ icon('image') }}</div>
+  <h2>No scans yet</h2>
+  <p class="muted">When you analyse an X-ray, it will appear here so you can come back to it any time.</p>
+  <a class="button primary large" href="{{ url_for('main.upload') }}">{{ icon('upload') }} Analyse your first X-ray</a>
+</section>
+{% endif %}
+{% endblock %}
